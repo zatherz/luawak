@@ -6,7 +6,7 @@ LuaJIT library using FFI to read .wak files (like the Noita `data.wak`).
 
 ## Extracting files
 
-```
+```lua
 local wak = require("wak") -- load the library
                            -- you can also use something like:
 			   -- local wak = loadfile("mods/my_mod/files/wak.lua")()
@@ -19,7 +19,7 @@ file:write_to("iceskull.png") -- write the data into a file on-disk
 ```
 
 ## Reading files
-```
+```lua
 local wak = require("wak")
 local ar = wak.open("data/data.wak")
 local materials_file = ar:open("data/materials.xml")
