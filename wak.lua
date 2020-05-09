@@ -63,7 +63,7 @@ local function read_toc(wak, predicate)
 end
 
 function wak.open(path)
-  local wak_f = ffi.C.fopen(path, "r")
+  local wak_f = ffi.C.fopen(path, "rb")
   if wak_f == nil then return nil end
 
   ffi.C.fseek(wak_f, INT_SIZE, 0)
