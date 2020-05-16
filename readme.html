@@ -1,0 +1,171 @@
+<h1>LuaWAK</h1>
+
+<p>LuaWAK is a single-file LuaJIT library that makes use of FFI to read, alter and write files in the Noita WizardPak (.wak) format, such as the game&rsquo;s assets archive <code>data.wak</code>.</p>
+
+<h1>Basic Usage</h1>
+
+<h2>Extracting files</h2>
+
+<p>```lua
+local wak = require(&ldquo;wak&rdquo;) &ndash; load the library
+                           &ndash; you can also use something like:
+               &ndash; local wak = loadfile(&ldquo;mods/my_mod/files/wak.lua&rdquo;)()</p>
+
+<p>local ar = wak.open(&ldquo;data/data.wak&rdquo;) &ndash; open the .wak file</p>
+
+<p>local file = ar:open(&ldquo;data/enemies_gfx/iceskull.png&rdquo;) &ndash; open any file within the data.wak</p>
+
+<p>file:write(&ldquo;iceskull.png&rdquo;) &ndash; write the data into a file on-disk
+```</p>
+
+<h2>Reading files</h2>
+
+<p>```lua
+local wak = require(&ldquo;wak&rdquo;)
+local ar = wak.open(&ldquo;data/data.wak&rdquo;)
+local materials_file = ar:open(&ldquo;data/materials.xml&rdquo;)</p>
+
+<p>local materials_xml = materials_file:read() &ndash; read the contents of the file into a string</p>
+
+<p>print(materials_xml)</p>
+
+<p>for file in ar:files() &ndash; iterate all the files in the archive
+    print(file)
+end
+```</p>
+
+<h2>Modifying archives</h2>
+
+<p>```lua
+local wak = require(&ldquo;wak&rdquo;)
+local ar = wak.open(&ldquo;data/data.wak&rdquo;)</p>
+
+<p>ar:set(&ldquo;data/materials.xml&rdquo;, &ldquo;<Materials> </Materials>&rdquo;) &ndash; set the contents of the file</p>
+
+<p>ar:add(&ldquo;data/my_file.txt&rdquo;, &ldquo;Hello!&rdquo;) &ndash; add a new file</p>
+
+<p>local my_file = ar:open(&ldquo;data/my_file.txt&rdquo;)
+print(my_file:read()) &ndash; added files work like normal</p>
+
+<p>ar:write(&ldquo;data/data.wak.new&rdquo;) &ndash; write the modified archive
+```</p>
+
+<h2>Creating new archives</h2>
+
+<p>```lua
+local wak = require(&ldquo;wak&rdquo;)
+local ar = wak.new()</p>
+
+<p>ar:add(&ldquo;1.txt&rdquo;, &ldquo;One&rdquo;) &ndash; add a file
+ar:add(&ldquo;2.txt&rdquo;, &ldquo;Two&rdquo;) &ndash; add another file
+ar:set(&ldquo;3.txt&rdquo;, &ldquo;Three&rdquo;) &ndash; :set does the same thing</p>
+
+<p>ar:write(&ldquo;my.wak&rdquo;) - write the new archive to disk
+```</p>
+
+<h1>API</h1>
+
+<ul>
+<li><p>global table <code>wak</code></p>
+
+<ul>
+<li><p>function <code>open(path : string, lenient : boolean?) : wak_archive</code></p>
+
+<p>opens a .wak file and returns its representation as a <code>wak_archive</code> object<br/>
+if the <code>lenient</code> optional argument is passed as <code>true</code> the function will return <code>nil</code> if the file can&rsquo;t be opened, otherwise an error will be raised</p></li>
+<li><p>function <code>new() : wak_archive</code></p>
+
+<p>creates a new in-memory wak archive</p></li>
+</ul>
+</li>
+<li><p>type <code>wak_archive</code></p>
+
+<ul>
+<li><p>field <code>path</code></p>
+
+<p>contains the path that the archive has been loaded from<br/>
+initialized with <code>"(memory)"</code> for archives created with <code>wak.new()</code></p></li>
+<li><p>function <code>preload_all()</code></p>
+
+<p>preloads metadata about all files<br/>
+luawak conserves memory and maintains speed by avoiding reading the entire file - instead, chunks are loaded as they are needed, e.g. to grab a particular file; this function forces the entire file to be loaded (but note that the file stream will still be owned by the object)</p></li>
+<li><p>function <code>open(path : string) : wak_file</code></p>
+
+<p>opens a file within the archive and returns it</p></li>
+<li><p>function <code>extract(path : string, out_path : string)</code></p>
+
+<p>extracts a file from the archive into an on-disk file<br/>
+will do nothing if <code>path</code> doesn&rsquo;t exist in the archive</p></li>
+<li><p>function <code>add(path : string, content : string) : wak_file</code></p>
+
+<p>adds a file named <code>path</code> with <code>content</code> as the data to the archive<br/>
+returns the <code>wak_file</code> object that was added<br/>
+will raise an error if the file exists
+will cause the entire archive to be loaded into memory</p></li>
+<li><p>function <code>set(path : string, content : string) : wak_file</code></p>
+
+<p>adds or changes a file named <code>path</code> in the archive, setting its content to <code>content</code><br/>
+returns the <code>wak_file</code> object that was added<br/>
+will work for both existing files and new files<br/>
+will not load any more data from the archive than is already in memory</p></li>
+<li><p>function <code>import(path : string, imp_path : string) : wak_file</code></p>
+
+<p>adds or changes a file named <code>path</code> in the archive, setting its content to the data in a file specified by <code>imp_path</code><br/>
+same behavior as <code>:set</code></p></li>
+<li><p>function <code>remove(path : string)</code></p>
+
+<p>removes the file at <code>path</code> from the archive<br/>
+will do nothing if the file doesn&rsquo;t exist</p></li>
+<li><p>function <code>count_files() : number</code></p>
+
+<p>returns a count of all files in the archive, including files added by <code>:add</code>/<code>:set</code>/<code>:import</code><br/>
+will cause the entire archive to be loaded into memory</p></li>
+<li><p>function <code>files() : iterator&lt;wak_file&gt;</code></p>
+
+<p>the <code>:files</code> function acts as an iterator, providing a <code>wak_file</code> object each loop<br/>
+it&rsquo;s used similar to <code>ipairs</code> and <code>pairs</code>: <code>for file in archive:files()</code></p></li>
+<li><p>function <code>force_rebuild_on_write()</code></p>
+
+<p>by default, if no changes are made to an archive, <code>:write</code> is essentially just a copy of the file<br/>
+if changes <em>are</em> made, the function automatically switches to rebuilding the entire archive from scratch<br/>
+if this function is called once before any calls to <code>:write</code>, luawak will drop the above behavior and always choose to rebuild the archive</p></li>
+<li><p>function <code>write(out_path : string)</code></p>
+
+<p>writes the whole archive to a file on disk<br/>
+if the archive has been modified or <code>:force_rebuild_on_write</code> has been called before, the archive will be rebuilt from scratch at the provided file path<br/>
+this function will reject writing to an <code>out_path</code> that is the same as the path the archive had been loaded from due to luawak&rsquo;s streaming behavior - see <code>:write_and_dispose</code> below</p></li>
+<li><p>function <code>write_and_dispose(out_path : string)</code></p>
+
+<p>same behavior as <code>:write</code><br/>
+however, after this function quits, the object is disposed and unusable (see <code>:dispose</code>)<br/>
+this method <strong>can</strong> write to the same <code>out_path</code> as the path that the archive was initially loaded from</p></li>
+<li><p>function <code>dispose()</code></p>
+
+<p>closes the underlying file stream and disposes of the archive&rsquo;s resources, rendering it unusable<br/>
+note: <code>dispose()</code> is called automatically when the archive object is garbage collected; calling it more than one time is perfectly valid and has no effect<br/>
+calling any functions on a disposed object will raise errors</p></li>
+</ul>
+</li>
+<li><p>type <code>wak_file</code></p>
+
+<ul>
+<li><p>field <code>length</code></p>
+
+<p>length of the file in bytes</p></li>
+<li><p>field <code>path</code></p>
+
+<p>path to the file within the .wak archive</p></li>
+<li><p>function <code>read() : string</code></p>
+
+<p>returns the data of the file as a string</p></li>
+<li><p>function <code>write(out_path) nil</code></p>
+
+<p>writes the wak file into an on-disk file at the path specified by <code>out_path</code></p></li>
+</ul>
+</li>
+</ul>
+
+
+<h1>License</h1>
+
+<p>LuaWAK is licensed under the MIT license. See <code>LICENSE</code> in this repository.</p>
