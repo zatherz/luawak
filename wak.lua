@@ -79,7 +79,7 @@ local WAK_FUNCS = {}
 local WAK_MT = {
     __index = WAK_FUNCS,
     __tostring = function(self)
-        return "wak archive: " .. self.path
+        return "wak.archive(" .. self.path .. ")"
     end
 }
 
@@ -87,7 +87,7 @@ local WAK_FILE_FUNCS = {}
 local WAK_FILE_MT = {
     __index = WAK_FILE_FUNCS,
     __tostring = function(self)
-        return "wak file: " .. self.path
+        return "wak.file(" .. self.path .. ")"
     end
 }
 
@@ -250,7 +250,7 @@ function WAK_FUNCS:extract(path, out_path)
     if not self._stream then return end
 
     local found = false
-    read_toc(function(file)
+    read_toc(self, function(file)
         if file.path == path then
             found = true
             file:write(out_path)
@@ -360,8 +360,9 @@ function WAK_FUNCS:files()
     return files_gen
 end
 
-local function wak_file_get_buf(self)
+local function seek_and_get_file_buf(self)
     local buf
+    local prev_pos = ffi.C.ftell(self._wak._stream)
     if self._content then
         buf = ffi.cast(
             "void*",
@@ -373,7 +374,7 @@ local function wak_file_get_buf(self)
         buf = ffi.new("char[?]", self.length)
         safe_fread(buf, ffi.sizeof("char"), self.length, self._wak._stream)
     end
-    return buf
+    return buf, prev_pos
 end
 
 local function build_archive(wak)
@@ -437,7 +438,7 @@ local function build_archive(wak)
     for path, file in pairs(wak._files) do
         if not file._removed then
             i = i + 1
-            local file_buf = wak_file_get_buf(file)
+            local file_buf = seek_and_get_file_buf(file)
             ffi.C.memcpy(buf + buf_offs, file_buf, file.length)
             buf_offs = buf_offs + file.length
         end
@@ -528,10 +529,11 @@ end
 function WAK_FILE_FUNCS:write(out_path)
     check_disposed(self._wak)
 
-    local buf = wak_file_get_buf(self)
+    local buf, prev_pos = seek_and_get_file_buf(self)
 
     local out_f = safe_fopen(out_path, "w")
     ffi.C.fwrite(buf, ffi.sizeof("char"), self.length, out_f)
+    ffi.C.fseek(self._wak._stream, prev_pos, 0)
 
     ffi.C.fclose(out_f)
 end
